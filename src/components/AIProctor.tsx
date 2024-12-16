@@ -12,6 +12,7 @@ const AIProctor = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [warningCount, setWarningCount] = useState(0);
@@ -26,6 +27,8 @@ const AIProctor = () => {
           video: true,
           audio: true 
         });
+        
+        streamRef.current = stream;
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -50,15 +53,28 @@ const AIProctor = () => {
 
     initializeDevices();
     return () => {
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach(track => track.stop());
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
+      stopAllDevices();
     };
   }, []);
+
+  const stopAllDevices = () => {
+    // Stop all tracks in the stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+  };
 
   const capturePhoto = () => {
     if (canvasRef.current && videoRef.current) {
@@ -80,7 +96,7 @@ const AIProctor = () => {
     }
   };
 
-  const startMonitoring = () => {
+  const startMonitoring = async () => {
     if (referencePhotos.length < 3) {
       toast({
         title: "Error",
@@ -89,6 +105,37 @@ const AIProctor = () => {
       });
       return;
     }
+
+    // If devices were stopped, reinitialize them
+    if (!streamRef.current) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true,
+          audio: true 
+        });
+        
+        streamRef.current = stream;
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
+        analyserRef.current.fftSize = 256;
+      } catch (error) {
+        console.error('Error reinitializing devices:', error);
+        toast({
+          title: "Error",
+          description: "Unable to restart camera or microphone. Please refresh the page.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setIsMonitoring(true);
     setWarningCount(0);
     toast({
@@ -99,6 +146,7 @@ const AIProctor = () => {
 
   const stopMonitoring = () => {
     setIsMonitoring(false);
+    stopAllDevices();
     toast({
       title: "Monitoring Stopped",
       description: "AI Proctor monitoring has been stopped",
