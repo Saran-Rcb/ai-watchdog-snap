@@ -10,6 +10,7 @@ const AIProctor = () => {
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [warningCount, setWarningCount] = useState(0);
+  const [lastWarningTime, setLastWarningTime] = useState(0);
   const { toast } = useToast();
 
   // Initialize webcam
@@ -69,37 +70,70 @@ const AIProctor = () => {
       return;
     }
     setIsMonitoring(true);
+    setWarningCount(0);
     toast({
       title: "Monitoring Started",
       description: "AI Proctor is now monitoring your session",
     });
   };
 
-  // Simulate AI detection (in real implementation, you'd use a proper AI model)
+  const stopMonitoring = () => {
+    setIsMonitoring(false);
+    toast({
+      title: "Monitoring Stopped",
+      description: "AI Proctor monitoring has been stopped",
+    });
+  };
+
+  // Enhanced AI detection simulation
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isMonitoring) {
       interval = setInterval(() => {
-        // Simulate detection (random for demo)
-        if (Math.random() > 0.8) {
-          setWarningCount(prev => {
-            const newCount = prev + 1;
-            if (newCount >= 20) {
-              window.close();
-              return prev;
+        if (canvasRef.current && videoRef.current) {
+          const context = canvasRef.current.getContext('2d');
+          if (context) {
+            // Capture current frame
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            context.drawImage(videoRef.current, 0, 0);
+            
+            // Simulate AI detection with more sophisticated logic
+            const currentTime = Date.now();
+            const timeSinceLastWarning = currentTime - lastWarningTime;
+            
+            // Random detection with cooldown and increasing probability
+            const baseDetectionProbability = 0.3; // 30% base chance
+            const timeFactorMultiplier = Math.min(timeSinceLastWarning / 10000, 1); // Increases over 10 seconds
+            const finalProbability = baseDetectionProbability * timeFactorMultiplier;
+
+            if (Math.random() < finalProbability) {
+              setWarningCount(prev => {
+                const newCount = prev + 1;
+                if (newCount >= 20) {
+                  toast({
+                    title: "Session Terminated",
+                    description: "Maximum warnings reached. Closing session.",
+                    variant: "destructive",
+                  });
+                  setTimeout(() => window.close(), 2000);
+                  return prev;
+                }
+                setLastWarningTime(currentTime);
+                toast({
+                  title: "Warning",
+                  description: `Suspicious activity detected! Warning ${newCount}/20`,
+                  variant: "destructive",
+                });
+                return newCount;
+              });
             }
-            toast({
-              title: "Warning",
-              description: `Suspicious activity detected! Warning ${newCount}/20`,
-              variant: "destructive",
-            });
-            return newCount;
-          });
+          }
         }
-      }, 5000);
+      }, 2000); // Check every 2 seconds
     }
     return () => clearInterval(interval);
-  }, [isMonitoring]);
+  }, [isMonitoring, lastWarningTime]);
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -129,6 +163,13 @@ const AIProctor = () => {
             variant="secondary"
           >
             Start Monitoring
+          </Button>
+          <Button
+            onClick={stopMonitoring}
+            disabled={!isMonitoring}
+            variant="destructive"
+          >
+            Stop Monitoring
           </Button>
         </div>
 
