@@ -156,7 +156,7 @@ const AIProctor = () => {
   const handleWarning = (reason: string) => {
     setWarningCount(prev => {
       const newCount = prev + 1;
-      if (newCount >= 20) {
+      if (newCount >= 10) {
         toast({
           title: "Session Terminated",
           description: "Maximum warnings reached. Closing session.",
@@ -168,7 +168,7 @@ const AIProctor = () => {
       setLastWarningTime(Date.now());
       toast({
         title: "Warning",
-        description: `Suspicious activity detected: ${reason}! Warning ${newCount}/20`,
+        description: `Suspicious activity detected: ${reason}! Warning ${newCount}/10`,
         variant: "destructive",
       });
       return newCount;
