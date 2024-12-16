@@ -3,39 +3,59 @@ import { Camera, AlertTriangle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import VideoFeed from './VideoFeed';
+import ReferencePhotos from './ReferencePhotos';
+import { detectVoiceActivity, detectVisualAnomaly } from '@/utils/detectionUtils';
 
 const AIProctor = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const [referencePhotos, setReferencePhotos] = useState<string[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [warningCount, setWarningCount] = useState(0);
   const [lastWarningTime, setLastWarningTime] = useState(0);
   const { toast } = useToast();
 
-  // Initialize webcam
+  // Initialize webcam and audio
   useEffect(() => {
-    const initializeCamera = async () => {
+    const initializeDevices = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true,
+          audio: true 
+        });
+        
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        // Initialize audio analysis
+        audioContextRef.current = new AudioContext();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyserRef.current);
+        analyserRef.current.fftSize = 256;
+
       } catch (error) {
-        console.error('Error accessing webcam:', error);
+        console.error('Error accessing devices:', error);
         toast({
-          title: "Camera Error",
-          description: "Unable to access webcam. Please check permissions.",
+          title: "Error",
+          description: "Unable to access camera or microphone. Please check permissions.",
           variant: "destructive",
         });
       }
     };
 
-    initializeCamera();
+    initializeDevices();
     return () => {
       if (videoRef.current?.srcObject) {
         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
         tracks.forEach(track => track.stop());
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
       }
     };
   }, []);
@@ -85,52 +105,58 @@ const AIProctor = () => {
     });
   };
 
-  // Enhanced AI detection simulation
+  const handleWarning = (reason: string) => {
+    setWarningCount(prev => {
+      const newCount = prev + 1;
+      if (newCount >= 20) {
+        toast({
+          title: "Session Terminated",
+          description: "Maximum warnings reached. Closing session.",
+          variant: "destructive",
+        });
+        setTimeout(() => window.close(), 2000);
+        return prev;
+      }
+      setLastWarningTime(Date.now());
+      toast({
+        title: "Warning",
+        description: `Suspicious activity detected: ${reason}! Warning ${newCount}/20`,
+        variant: "destructive",
+      });
+      return newCount;
+    });
+  };
+
+  // Enhanced AI detection with voice monitoring
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isMonitoring) {
+    if (isMonitoring && analyserRef.current) {
       interval = setInterval(() => {
+        // Check for voice activity
+        const dataArray = new Uint8Array(analyserRef.current!.frequencyBinCount);
+        analyserRef.current!.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        const normalizedAverage = average / 256; // Normalize to 0-1 range
+
+        if (detectVoiceActivity(normalizedAverage)) {
+          handleWarning("Voice detected");
+        }
+
+        // Visual detection
         if (canvasRef.current && videoRef.current) {
           const context = canvasRef.current.getContext('2d');
           if (context) {
-            // Capture current frame
             canvasRef.current.width = videoRef.current.videoWidth;
             canvasRef.current.height = videoRef.current.videoHeight;
             context.drawImage(videoRef.current, 0, 0);
             
-            // Simulate AI detection with more sophisticated logic
-            const currentTime = Date.now();
-            const timeSinceLastWarning = currentTime - lastWarningTime;
-            
-            // Random detection with cooldown and increasing probability
-            const baseDetectionProbability = 0.3; // 30% base chance
-            const timeFactorMultiplier = Math.min(timeSinceLastWarning / 10000, 1); // Increases over 10 seconds
-            const finalProbability = baseDetectionProbability * timeFactorMultiplier;
-
-            if (Math.random() < finalProbability) {
-              setWarningCount(prev => {
-                const newCount = prev + 1;
-                if (newCount >= 20) {
-                  toast({
-                    title: "Session Terminated",
-                    description: "Maximum warnings reached. Closing session.",
-                    variant: "destructive",
-                  });
-                  setTimeout(() => window.close(), 2000);
-                  return prev;
-                }
-                setLastWarningTime(currentTime);
-                toast({
-                  title: "Warning",
-                  description: `Suspicious activity detected! Warning ${newCount}/20`,
-                  variant: "destructive",
-                });
-                return newCount;
-              });
+            const timeSinceLastWarning = Date.now() - lastWarningTime;
+            if (detectVisualAnomaly(timeSinceLastWarning)) {
+              handleWarning("Visual anomaly");
             }
           }
         }
-      }, 2000); // Check every 2 seconds
+      }, 2000);
     }
     return () => clearInterval(interval);
   }, [isMonitoring, lastWarningTime]);
@@ -138,15 +164,8 @@ const AIProctor = () => {
   return (
     <div className="max-w-2xl mx-auto p-4">
       <div className="space-y-4">
-        <div className="relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full rounded-lg border border-gray-200"
-          />
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
+        <VideoFeed videoRef={videoRef} />
+        <canvas ref={canvasRef} className="hidden" />
 
         <div className="flex gap-4 justify-center">
           <Button
@@ -182,20 +201,7 @@ const AIProctor = () => {
           </Alert>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
-          {referencePhotos.map((photo, index) => (
-            <div key={index} className="relative">
-              <img
-                src={photo}
-                alt={`Reference ${index + 1}`}
-                className="w-full rounded-lg border border-gray-200"
-              />
-              <span className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded-md text-sm">
-                Reference {index + 1}
-              </span>
-            </div>
-          ))}
-        </div>
+        <ReferencePhotos photos={referencePhotos} />
       </div>
     </div>
   );
