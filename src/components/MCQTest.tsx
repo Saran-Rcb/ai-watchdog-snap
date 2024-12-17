@@ -8,6 +8,7 @@ import ResultsCard from "./ResultsCard";
 import { generateQuestionsApi, evaluateAnswersApi } from "@/utils/geminiApi";
 import { Progress } from "./ui/progress";
 import { Timer } from "lucide-react";
+import { Question } from "@/types/Question";  // Add this import
 
 interface MCQTestProps {
   onTestStart: () => void;

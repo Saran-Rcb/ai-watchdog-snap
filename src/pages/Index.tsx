@@ -30,7 +30,7 @@ const Index = () => {
           />
         </div>
         <div className="md:col-span-1">
-          <AIProctor isActive={testStarted && !testCompleted} />
+          <AIProctor />  {/* Removed isActive prop */}
         </div>
       </div>
     </div>
