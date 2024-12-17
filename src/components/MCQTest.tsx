@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Input } from "./ui/input";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "./ui/card";
 
 interface Question {
@@ -10,6 +10,8 @@ interface Question {
   options: string[];
   correctAnswer: string;
 }
+
+const GEMINI_API_KEY = "AIzaSyANsR1Qadh-Sl-hqmrEWomknctS4l93zY0";
 
 const MCQTest = () => {
   const [courseTitle, setCourseTitle] = useState("");
@@ -31,17 +33,7 @@ const MCQTest = () => {
     }
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        toast({
-          title: "Error",
-          description: "API key not found. Please check your configuration.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,11 +85,10 @@ const MCQTest = () => {
     }
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent", {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_GEMINI_API_KEY}`,
         },
         body: JSON.stringify({
           contents: [{
@@ -110,6 +101,10 @@ const MCQTest = () => {
           }]
         })
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to calculate score');
+      }
 
       const data = await response.json();
       const score = parseInt(data.candidates[0].content.parts[0].text);
