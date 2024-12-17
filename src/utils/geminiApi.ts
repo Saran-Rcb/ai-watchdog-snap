@@ -11,7 +11,7 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Create 10 multiple choice questions for ${courseTitle} at ${level} level. Return a JSON array where each question object has these properties: "question" (string), "options" (array of 4 strings), and "correctAnswer" (string matching one of the options). The questions should be challenging and topic-relevant. Important: Return only valid JSON, no markdown or other formatting.`
+            text: `Create 50 multiple choice questions for ${courseTitle} at ${level} level. Return a JSON array where each question object has these properties: "question" (string), "options" (array of 4 strings), and "correctAnswer" (string matching one of the options). The questions should be challenging and topic-relevant. Important: Return only valid JSON, no markdown or other formatting.`
           }]
         }]
       })
