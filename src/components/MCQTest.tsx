@@ -11,7 +11,7 @@ interface Question {
   correctAnswer: string;
 }
 
-const GEMINI_API_KEY = "AIzaSyANsR1Qadh-Sl-hqmrEWomknctS4l93zY0";
+const GEMINI_API_KEY = "AIzaSyDI0MxArtwlbm7Wy0wR7jtPNPRJjrO5j2E";
 
 const MCQTest = () => {
   const [courseTitle, setCourseTitle] = useState("");
@@ -41,7 +41,7 @@ const MCQTest = () => {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Generate 10 multiple choice questions for ${courseTitle} at ${level} level. Format the response as a JSON array with each question having: question, options (array of 4 choices), and correctAnswer. Make sure the questions are challenging and relevant to the topic.`
+              text: `Generate 10 multiple choice questions for ${courseTitle} at ${level} level. Format the response as a JSON array with each question having: question, options (array of 4 choices), and correctAnswer. Make sure the questions are challenging and relevant to the topic. Return only the JSON array without any markdown formatting or additional text.`
             }]
           }]
         })
@@ -57,6 +57,11 @@ const MCQTest = () => {
       setQuestions(parsedQuestions);
       setUserAnswers({});
       setShowResults(false);
+      
+      toast({
+        title: "Success",
+        description: "Questions generated successfully!",
+      });
     } catch (error) {
       console.error('Error generating questions:', error);
       toast({
@@ -110,6 +115,11 @@ const MCQTest = () => {
       const score = parseInt(data.candidates[0].content.parts[0].text);
       setScore(score);
       setShowResults(true);
+      
+      toast({
+        title: "Success",
+        description: "Test submitted successfully!",
+      });
     } catch (error) {
       toast({
         title: "Error",
