@@ -31,11 +31,20 @@ const MCQTest = () => {
     }
 
     try {
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent", {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        toast({
+          title: "Error",
+          description: "API key not found. Please check your configuration.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_GEMINI_API_KEY}`,
         },
         body: JSON.stringify({
           contents: [{
@@ -46,15 +55,21 @@ const MCQTest = () => {
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to generate questions');
+      }
+
       const data = await response.json();
       const parsedQuestions = JSON.parse(data.candidates[0].content.parts[0].text);
       setQuestions(parsedQuestions);
       setUserAnswers({});
       setShowResults(false);
     } catch (error) {
+      console.error('Error generating questions:', error);
       toast({
         title: "Error",
-        description: "Failed to generate questions. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to generate questions. Please try again.",
         variant: "destructive",
       });
     }
