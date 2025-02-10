@@ -1,3 +1,4 @@
+
 const GEMINI_API_KEY = "AIzaSyDI0MxArtwlbm7Wy0wR7jtPNPRJjrO5j2E";
 
 export const generateQuestionsApi = async (courseTitle: string, level: string) => {
