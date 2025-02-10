@@ -12,7 +12,19 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Create 50 multiple choice questions for ${courseTitle} at ${level} level. Return a JSON array where each question object has these properties: "question" (string), "options" (array of 4 strings), and "correctAnswer" (string matching one of the options). The questions should be challenging and topic-relevant. Important: Return only valid JSON, no markdown or other formatting.`
+            text: `Generate a JSON array of 50 multiple choice questions for ${courseTitle} at ${level} level. Each question object should have: 
+            1. "question" (string) - the question text
+            2. "options" (array of 4 strings) - possible answers
+            3. "correctAnswer" (string) - the correct answer that matches one of the options
+            Important: Return ONLY valid JSON array, no additional text or formatting.
+            Example format:
+            [
+              {
+                "question": "What is...",
+                "options": ["A", "B", "C", "D"],
+                "correctAnswer": "A"
+              }
+            ]`
           }]
         }]
       })
@@ -21,6 +33,7 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
 
   if (!response.ok) {
     const errorData = await response.json();
+    console.error('API Error:', errorData);
     throw new Error(errorData.error?.message || 'Failed to generate questions');
   }
 
@@ -28,11 +41,33 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
   const textContent = data.candidates[0].content.parts[0].text;
   
   try {
-    // Remove any markdown formatting if present
-    const jsonStr = textContent.replace(/```json\n|\n```/g, '').trim();
-    return JSON.parse(jsonStr);
+    // Clean the response text to ensure we only parse the JSON part
+    const jsonStart = textContent.indexOf('[');
+    const jsonEnd = textContent.lastIndexOf(']') + 1;
+    const jsonStr = textContent.slice(jsonStart, jsonEnd);
+    
+    console.log('Attempting to parse JSON:', jsonStr);
+    const questions = JSON.parse(jsonStr);
+    
+    // Validate the structure of each question
+    const validQuestions = questions.filter((q: any) => {
+      return (
+        typeof q.question === 'string' &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        typeof q.correctAnswer === 'string' &&
+        q.options.includes(q.correctAnswer)
+      );
+    });
+
+    if (validQuestions.length === 0) {
+      throw new Error('No valid questions were generated');
+    }
+
+    return validQuestions.slice(0, 50); // Ensure we only return max 50 questions
   } catch (error) {
-    console.error('Parsing error:', textContent);
+    console.error('Parsing error:', error);
+    console.error('Raw content:', textContent);
     throw new Error('Failed to parse questions from API response');
   }
 };
@@ -48,9 +83,9 @@ export const evaluateAnswersApi = async (courseTitle: string, questions: any[], 
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Evaluate these answers for ${courseTitle} MCQ test. Return only the number of correct answers:
-            Questions and correct answers: ${JSON.stringify(questions)}
-            User answers: ${JSON.stringify(userAnswers)}`
+            text: `Given these MCQ test answers for ${courseTitle}, count and return ONLY the number of correct answers (just the number, nothing else):
+            Questions and answers: ${JSON.stringify(questions)}
+            User's answers: ${JSON.stringify(userAnswers)}`
           }]
         }]
       })
@@ -58,9 +93,20 @@ export const evaluateAnswersApi = async (courseTitle: string, questions: any[], 
   );
 
   if (!response.ok) {
+    const errorData = await response.json();
+    console.error('API Error:', errorData);
     throw new Error('Failed to evaluate answers');
   }
 
   const data = await response.json();
-  return parseInt(data.candidates[0].content.parts[0].text);
+  const result = data.candidates[0].content.parts[0].text;
+  
+  // Extract just the number from the response
+  const score = parseInt(result.replace(/\D/g, ''));
+  if (isNaN(score)) {
+    console.error('Invalid score response:', result);
+    throw new Error('Failed to calculate score');
+  }
+  
+  return score;
 };
