@@ -2,21 +2,20 @@
 const GEMINI_API_KEY = "AIzaSyB1bnriwsEVMnUypbC6j2DLj1KYVOfWmVY";
 
 export const generateQuestionsApi = async (courseTitle: string, level: string) => {
-  const prompt = `Generate 50 multiple choice questions for ${courseTitle} at ${level} level.
-  Make sure to follow this exact JSON format:
+  const prompt = `Generate 50 multiple choice questions for ${courseTitle} at ${level} level. Follow this EXACT format:
   [
     {
-      "question": "Question text here?",
-      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-      "correctAnswer": "Option that exactly matches one of the options"
+      "question": "What is...",
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+      "correctAnswer": "A) Option 1"
     }
   ]
-  Requirements:
+  Rules:
   - Generate exactly 50 questions
   - Each question must have exactly 4 options
+  - Options must be prefixed with A), B), C), D)
   - The correctAnswer must exactly match one of the options
-  - Questions should be challenging but clear
-  - Return only the JSON array, no other text or formatting`;
+  - Return valid JSON array only`;
 
   try {
     const response = await fetch(
@@ -41,56 +40,41 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Error:', errorData);
-      throw new Error(errorData.error?.message || 'Failed to generate questions');
+      throw new Error('API request failed');
     }
 
     const data = await response.json();
-    console.log('Raw API response:', data);
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
       throw new Error('Invalid API response format');
     }
 
-    const textContent = data.candidates[0].content.parts[0].text;
-    console.log('Text content:', textContent);
-
+    const text = data.candidates[0].content.parts[0].text;
+    
     // Find the JSON array in the response
-    const jsonMatch = textContent.match(/\[[\s\S]*\]/);
+    const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
     if (!jsonMatch) {
-      console.error('No JSON array found in response');
-      throw new Error('Invalid response format from API');
+      throw new Error('No valid JSON array found in response');
     }
 
-    const jsonStr = jsonMatch[0];
-    console.log('Extracted JSON string:', jsonStr);
-
     try {
-      const questions = JSON.parse(jsonStr);
+      const questions = JSON.parse(jsonMatch[0]);
       
-      // Validate each question's structure
+      // Validate questions structure
       const validQuestions = questions.filter((q: any) => {
-        const isValid = (
-          typeof q.question === 'string' &&
+        return (
+          q.question &&
           Array.isArray(q.options) &&
           q.options.length === 4 &&
-          typeof q.correctAnswer === 'string' &&
+          q.correctAnswer &&
           q.options.includes(q.correctAnswer)
         );
-        
-        if (!isValid) {
-          console.warn('Invalid question structure:', q);
-        }
-        
-        return isValid;
       });
 
       if (validQuestions.length === 0) {
-        throw new Error('No valid questions were generated');
+        throw new Error('No valid questions generated');
       }
 
-      // Ensure we return exactly 50 questions
       return validQuestions.slice(0, 50);
     } catch (parseError) {
       console.error('JSON Parse Error:', parseError);
@@ -104,55 +88,13 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
 
 export const evaluateAnswersApi = async (courseTitle: string, questions: any[], userAnswers: any) => {
   try {
-    const prompt = `You are an exam evaluator. Compare these MCQ test answers and provide the count of correct answers.
-    Questions with correct answers: ${JSON.stringify(questions)}
-    Student's answers: ${JSON.stringify(userAnswers)}
-    Important: Return ONLY the number of correct answers, no other text.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0,
-            topK: 1,
-            topP: 1,
-          }
-        })
+    let correctCount = 0;
+    questions.forEach((q, index) => {
+      if (userAnswers[index] === q.correctAnswer) {
+        correctCount++;
       }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Error:', errorData);
-      throw new Error('Failed to evaluate answers');
-    }
-
-    const data = await response.json();
-    console.log('Evaluation response:', data);
-
-    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid API response format');
-    }
-
-    const result = data.candidates[0].content.parts[0].text;
-    console.log('Raw score result:', result);
-    
-    // Extract only the number from the response
-    const score = parseInt(result.replace(/\D/g, ''));
-    if (isNaN(score)) {
-      console.error('Invalid score response:', result);
-      throw new Error('Failed to calculate score');
-    }
-    
-    return score;
+    });
+    return correctCount;
   } catch (error) {
     console.error('Error evaluating answers:', error);
     throw new Error('Failed to evaluate answers. Please try again.');
