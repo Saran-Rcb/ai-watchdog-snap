@@ -24,19 +24,19 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
             parts: [{ text: prompt }]
           }],
           generationConfig: {
-            temperature: 0.3,  // Reduced temperature for more consistent output
+            temperature: 0.3,
             maxOutputTokens: 8192,
             topP: 0.8,
             topK: 40
           },
           safetySettings: [
             {
-              category: "HARM_CATEGORY_DEROGATORY",
-              threshold: "BLOCK_NONE"
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_ONLY_HIGH"
             },
             {
-              category: "HARM_CATEGORY_TOXICITY",
-              threshold: "BLOCK_NONE"
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_ONLY_HIGH"
             }
           ]
         })
@@ -110,4 +110,3 @@ export const evaluateAnswersApi = async (courseTitle: string, questions: any[], 
     throw new Error('Failed to evaluate answers. Please try again.');
   }
 };
-
