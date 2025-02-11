@@ -2,20 +2,14 @@
 const GEMINI_API_KEY = "AIzaSyB1bnriwsEVMnUypbC6j2DLj1KYVOfWmVY";
 
 export const generateQuestionsApi = async (courseTitle: string, level: string) => {
-  const prompt = `Generate 50 multiple choice questions for ${courseTitle} at ${level} level. Follow this EXACT format:
+  const prompt = `Generate 50 multiple choice questions for ${courseTitle} at ${level} level. Each question must have exactly 4 options labeled A) to D), and one correct answer. Format the output EXACTLY as a JSON array like this, with no additional text:
   [
     {
-      "question": "What is...",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
-      "correctAnswer": "A) Option 1"
+      "question": "Sample question text?",
+      "options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
+      "correctAnswer": "A) First option"
     }
-  ]
-  Rules:
-  - Generate exactly 50 questions
-  - Each question must have exactly 4 options
-  - Options must be prefixed with A), B), C), D)
-  - The correctAnswer must exactly match one of the options
-  - Return valid JSON array only`;
+  ]`;
 
   try {
     const response = await fetch(
@@ -30,11 +24,21 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
             parts: [{ text: prompt }]
           }],
           generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.8,
+            temperature: 0.3,  // Reduced temperature for more consistent output
             maxOutputTokens: 8192,
-          }
+            topP: 0.8,
+            topK: 40
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_DEROGATORY",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_TOXICITY",
+              threshold: "BLOCK_NONE"
+            }
+          ]
         })
       }
     );
@@ -49,35 +53,37 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
       throw new Error('Invalid API response format');
     }
 
-    const text = data.candidates[0].content.parts[0].text;
+    const text = data.candidates[0].content.parts[0].text.trim();
     
-    // Find the JSON array in the response
-    const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON array found in response');
-    }
-
+    // Clean the response text to ensure it's valid JSON
+    const cleanedText = text.replace(/```json\n?|\n?```/g, '').trim();
+    
     try {
-      const questions = JSON.parse(jsonMatch[0]);
+      const questions = JSON.parse(cleanedText);
       
       // Validate questions structure
+      if (!Array.isArray(questions)) {
+        throw new Error('Response is not an array');
+      }
+
       const validQuestions = questions.filter((q: any) => {
         return (
           q.question &&
           Array.isArray(q.options) &&
           q.options.length === 4 &&
           q.correctAnswer &&
-          q.options.includes(q.correctAnswer)
+          q.options.includes(q.correctAnswer) &&
+          q.options.every((opt: string) => /^[A-D]\)/.test(opt))
         );
       });
 
       if (validQuestions.length === 0) {
-        throw new Error('No valid questions generated');
+        throw new Error('No valid questions found in response');
       }
 
       return validQuestions.slice(0, 50);
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
+      console.error('JSON Parse Error:', parseError, '\nResponse text:', cleanedText);
       throw new Error('Failed to parse questions JSON');
     }
   } catch (error) {
@@ -89,14 +95,19 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
 export const evaluateAnswersApi = async (courseTitle: string, questions: any[], userAnswers: any) => {
   try {
     let correctCount = 0;
-    questions.forEach((q, index) => {
-      if (userAnswers[index] === q.correctAnswer) {
+    let total = questions.length;
+    
+    Object.entries(userAnswers).forEach(([index, answer]) => {
+      const questionIndex = parseInt(index);
+      if (questions[questionIndex] && questions[questionIndex].correctAnswer === answer) {
         correctCount++;
       }
     });
+
     return correctCount;
   } catch (error) {
     console.error('Error evaluating answers:', error);
     throw new Error('Failed to evaluate answers. Please try again.');
   }
 };
+
