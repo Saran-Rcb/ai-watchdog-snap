@@ -1,9 +1,16 @@
 
-const GEMINI_API_KEY = "AIzaSyB1bnriwsEVMnUypbC6j2DLj1KYVOfWmVY";
+const getGeminiApiKey = () => {
+  return localStorage.getItem('GEMINI_API_KEY');
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const generateQuestionsApi = async (courseTitle: string, level: string) => {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error('Please enter your Gemini API key in settings');
+  }
+
   const prompt = `Generate 50 multiple choice questions for ${courseTitle} at ${level} level. Each question must have exactly 4 options labeled A) to D), and one correct answer. Format the output EXACTLY as a JSON array like this, with no additional text:
   [
     {
@@ -19,7 +26,7 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
   while (attempt < maxRetries) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: {
@@ -37,11 +44,11 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
             },
             safetySettings: [
               {
-                category: "HARM_CATEGORY_HATE_SPEECH",
+                category: "HARM_CATEGORY_HARASSMENT",
                 threshold: "BLOCK_ONLY_HIGH"
               },
               {
-                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                category: "HARM_CATEGORY_HATE_SPEECH",
                 threshold: "BLOCK_ONLY_HIGH"
               }
             ]
@@ -50,7 +57,7 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
       );
 
       if (response.status === 429) {
-        const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+        const waitTime = Math.pow(2, attempt) * 1000;
         console.log(`Rate limited, waiting ${waitTime}ms before retry...`);
         await delay(waitTime);
         attempt++;
@@ -62,7 +69,7 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
         console.error('API Error:', errorData);
         
         if (response.status === 429) {
-          throw new Error('API quota exceeded. Please try again later.');
+          throw new Error('API quota exceeded. Please try again later or use a different API key.');
         }
         
         throw new Error(errorData.error?.message || 'API request failed');
@@ -76,13 +83,11 @@ export const generateQuestionsApi = async (courseTitle: string, level: string) =
 
       const text = data.candidates[0].content.parts[0].text.trim();
       
-      // Clean the response text to ensure it's valid JSON
       const cleanedText = text.replace(/```json\n?|\n?```/g, '').trim();
       
       try {
         const questions = JSON.parse(cleanedText);
         
-        // Validate questions structure
         if (!Array.isArray(questions)) {
           throw new Error('Response is not an array');
         }
