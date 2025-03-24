@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -8,8 +7,8 @@ import QuestionCard from "./QuestionCard";
 import ResultsCard from "./ResultsCard";
 import { generateQuestionsApi, evaluateAnswersApi } from "@/utils/geminiApi";
 import { Progress } from "./ui/progress";
-import { Timer } from "lucide-react";
-import { Question } from "@/types/Question";  // Add this import
+import { Timer, Loader } from "lucide-react";
+import { Question } from "@/types/Question";
 
 interface MCQTestProps {
   onTestStart: () => void;
@@ -23,15 +22,14 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
   const [userAnswers, setUserAnswers] = useState<{ [key: number]: string }>({});
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(30 * 60); // 30 minutes in seconds
+  const [timeRemaining, setTimeRemaining] = useState(30 * 60);
   const [testInProgress, setTestInProgress] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Detect tab visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && testInProgress) {
-        // User switched tabs, auto-submit the test
         toast({
           title: "Tab Change Detected",
           description: "Test automatically submitted due to tab change.",
@@ -81,8 +79,8 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
     }
 
     try {
+      setIsLoading(true);
       const parsedQuestions = await generateQuestionsApi(courseTitle, level);
-      // Limit to 50 questions
       const limitedQuestions = parsedQuestions.slice(0, 50);
       setQuestions(limitedQuestions);
       setUserAnswers({});
@@ -102,6 +100,8 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
         description: error instanceof Error ? error.message : "Failed to generate questions. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,7 +133,6 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
         variant: passed ? "default" : "destructive",
       });
 
-      // Additional notification when test is submitted
       toast({
         title: "Test Submitted",
         description: `You answered ${Object.keys(userAnswers).length} out of ${questions.length} questions.`,
@@ -167,7 +166,16 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
               <SelectItem value="advanced">Advanced</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={generateQuestions}>Start Test</Button>
+          <Button onClick={generateQuestions} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                Generating Questions...
+              </>
+            ) : (
+              "Start Test"
+            )}
+          </Button>
         </div>
       )}
 
