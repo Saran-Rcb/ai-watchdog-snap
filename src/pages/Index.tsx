@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import MCQTest from "@/components/MCQTest";
 import AIProctor from "@/components/AIProctor";
@@ -17,7 +18,7 @@ const Index = () => {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             This test is monitored by AI. Please ensure your camera and microphone are enabled.
-            You will have 30 minutes to complete the test. The test will auto-submit if time runs out.
+            You will have 30 minutes to complete the test. The test will auto-submit if time runs out or if you change tabs.
           </AlertDescription>
         </Alert>
       )}
@@ -30,7 +31,7 @@ const Index = () => {
           />
         </div>
         <div className="md:col-span-1">
-          <AIProctor />  {/* Removed isActive prop */}
+          <AIProctor />
         </div>
       </div>
     </div>

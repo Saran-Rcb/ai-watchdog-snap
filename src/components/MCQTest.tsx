@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -25,6 +26,26 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
   const [timeRemaining, setTimeRemaining] = useState(30 * 60); // 30 minutes in seconds
   const [testInProgress, setTestInProgress] = useState(false);
   const { toast } = useToast();
+
+  // Detect tab visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && testInProgress) {
+        // User switched tabs, auto-submit the test
+        toast({
+          title: "Tab Change Detected",
+          description: "Test automatically submitted due to tab change.",
+          variant: "destructive",
+        });
+        handleSubmit();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [testInProgress]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -110,6 +131,12 @@ const MCQTest = ({ onTestStart, onTestComplete }: MCQTestProps) => {
           ? `You passed with ${percentage.toFixed(1)}%!` 
           : `You scored ${percentage.toFixed(1)}%. Required: 50%`,
         variant: passed ? "default" : "destructive",
+      });
+
+      // Additional notification when test is submitted
+      toast({
+        title: "Test Submitted",
+        description: `You answered ${Object.keys(userAnswers).length} out of ${questions.length} questions.`,
       });
     } catch (error) {
       toast({

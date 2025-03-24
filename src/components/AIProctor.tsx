@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, AlertTriangle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -244,7 +245,7 @@ const AIProctor = () => {
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Warning count: {warningCount}/20
+              Warning count: {warningCount}/10
             </AlertDescription>
           </Alert>
         )}
